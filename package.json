@@ -1,7 +1,7 @@
 {
   "name": "kinto",
   "version": "1.0.0-rc.3",
-  "description": "JavaScript client for Cliquet.",
+  "description": "JavaScript client for Kinto.",
   "main": "lib/index.js",
   "scripts": {
     "build": "babel -d lib/ src/",
@@ -31,7 +31,7 @@
     "indexeddb"
   ],
   "author": "Nicolas Perriault <nperriault@mozilla.com>",
-  "license": "MPL-2.0",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/Kinto/kinto.js/issues"
   },

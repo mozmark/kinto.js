@@ -9,9 +9,10 @@ const db = new Kinto(options);
 `options` is an object defining the following option values:
 
 - `remote`: The remote Kinto server endpoint root URL (eg. `"https://server/v1"`). Not that you *must* define a URL matching the version of the protocol the client supports, otherwise you'll get an error;
-- `headers`: The default headers to pass for every HTTP request performed to the Cliquet server (eg. `{"Authorization": "Basic bWF0Og=="}`);
+- `headers`: The default headers to pass for every HTTP request performed to the Kinto server (eg. `{"Authorization": "Basic bWF0Og=="}`);
 - `adapter`: The persistence layer adapter to use for saving data locally (default: `Kinto.adapters.IDB`); alternatively, a `Kinto.adapters.LocalStorage` adapter is also provided; last, if you plan on writing your own adapter, you can read more about how to do so in the [Extending Kinto.js](extending.md) section.
 - `requestMode`: The HTTP [CORS](https://fetch.spec.whatwg.org/#concept-request-mode) mode. Default: `cors`.
+- `bucket`: The [Kinto bucket name](http://kinto.readthedocs.org/en/latest/api/buckets.html) to use for remote syncing (default: "default").
 - `dbPrefix`: The prefix for the local database name (default: `""`). Use this option to isolate different specific databases, eg. for storing distinct users data.
 
 ## Collections
@@ -237,9 +238,9 @@ Synopsis:
     - The developer has to handle them manually using [`#resolve()`](#resolving-conflicts), and call `#sync()` again when done;
 3. If everything went fine, publish local changes;
     - Fail on any publication conflict detected;
-        * If `strategy` is set to `Collection.strategy.SERVER_WINS`, no remote data override will be performed by the server;
-        * If `strategy` is set to `Collection.strategy.CLIENT_WINS`, conflicting server records will be overriden with local changes;
-        * If `strategy` is set to `Collection.strategy.MANUAL`, conflicts will be reported in a dedicated array.
+        * If `strategy` is set to `Kinto.syncStrategy.SERVER_WINS`, no client data will overwrite the remote data;
+        * If `strategy` is set to `Kinto.syncStrategy.CLIENT_WINS`, conflicting server records will be overwritten with local changes;
+        * If `strategy` is set to `Kinto.syncStrategy.MANUAL`, both incoming and outgoing conflicts will be reported in a dedicated array.
 
 ```js
 articles.sync()
@@ -254,6 +255,7 @@ articles.sync()
 ### Error handling
 
 If anything goes wrong during sync, `colllection.sync()` will reject its promise with an `error` object, as follows:
+
 * If an unexpected HTTP status is received from the server, `error.response` will contain that response, for you to inspect
     (see the example above for detecting 401 Unauthorized errors).
 * If the server is unreachable, `error.response` will be undefined, but `error.message` will equal
@@ -261,40 +263,54 @@ If anything goes wrong during sync, `colllection.sync()` will reject its promise
 
 ### Synchronization strategies
 
-The `sync()` method accepts a `strategy` option, which itself accepts the following values:
+For publication conflicts, the `sync()` method accepts a `strategy` option, which itself accepts the following values:
 
-- `Collection.strategy.MANUAL` (default): Conflicts are reflected in a `conflicts` array as a result, and need to be resolved manually.
-- `Collection.strategy.SERVER_WINS`: Server data will be preserved;
-- `Collection.strategy.CLIENT_WINS`: Client data will be preserved.
+- `Kinto.syncStrategy.MANUAL` (default): Conflicts are reflected in a `conflicts` array as a result, and need to be resolved manually;
+- `Kinto.syncStrategy.SERVER_WINS`: Server data will always be preserved;
+- `Kinto.syncStrategy.CLIENT_WINS`: Client data will always be preserved.
+
+> Note:
+> `strategy` only applies to *outgoing* conflicts. *Incoming* conflicts will still
+> be reported in the `conflicts` array. See [`resolving conflicts section`](#resolving-conflicts).
 
 You can override default options by passing `#sync()` a new `options` object; Kinto will merge these new values with the default ones:
 
 ```js
+import Collection from "kinto/lib/collection";
+
 articles.sync({
-  strategy: Collection.strategy.CLIENT_WINS,
+  strategy: Kinto.syncStrategy.CLIENT_WINS,
   headers: {Authorization: "Basic bWF0Og=="}
 })
-  .then(console.log.bind(console));
-  .catch(console.error.bind(console));
+  .then(result => {
+    console.log(result);
+  })
+  .catch(error => {
+    console.error(error);
+  });
 ```
 
+The synchronization updates the local data, and provides information about performed operations.
 Sample result:
 
 ```js
 {
   ok: true,
   lastModified: 1434270764485,
+  conflicts: [], // Outgoing and incoming conflicts
   errors:    [], // Errors encountered, if any
   created:   [], // Created locally
   updated:   [], // Updated locally
   deleted:   [], // Deleted locally
-  conflicts: [], // Import conflicts
   skipped:   [], // Skipped imports
-  published: []  // Successfully published
+  published: [], // Successfully published
+  resolved:  [], // Resolved conflicts, according to selected strategy
 }
 ```
 
-If conflicts occured, they're listed in the `conflicts` property; they must be resolved locally and `sync()` called again.
+## Resolving conflicts manually
+
+When using `Kinto.syncStrategy.MANUAL`, if conflicts occur, they're listed in the `conflicts` property; they must be resolved locally and `sync()` called again.
 
 The `conflicts` array is in this form:
 
@@ -303,7 +319,7 @@ The `conflicts` array is in this form:
   // …
   conflicts: [
     {
-      type: "incoming", // can also be "outgoing"
+      type: "incoming", // can also be "outgoing" if stategy is MANUAL
       local: {
         _status: "created",
         id: "233a018a-fd2b-4d39-ba85-8bf3e13d73ec",
@@ -318,28 +334,33 @@ The `conflicts` array is in this form:
 }
 ```
 
-## Resolving conflicts
-
-Conflict resolution is achieved using the `#resolve()` method:
+Once the developer is done with merging records, conflicts are marked as
+resolved using the `#resolve()` method of the collection:
 
 ```js
-articles.sync()
-  .then(res => {
-    if (!conflicts.length)
-      return res;
-    return Promise.all(conflicts.map(conflict => {
-      return articles.resolve(conflict, conflict.remote);
-    }));
-  })
-  .then(_ => articles.sync())
-  .catch(console.error.bind(console));
+function sync() {
+  return articles.sync()
+    .then(res => {
+      if (res.ok)
+        return res;
+
+      // If conflicts, take remote version and sync again.
+      return Promise.all(res.conflicts.map(conflict => {
+        return articles.resolve(conflict, conflict.remote);
+      }))
+      .then(_ => sync());
+    })
+    .catch(error => {
+      console.error(error);
+    });
+}
 ```
 
-Here we're solving encountered conflicts by picking all remote versions. After conflicts being properly addressed, we're syncing the collection again.
+Here we're solving encountered conflicts by picking all remote versions. After conflicts being properly addressed, we're syncing the collection again, until no conflicts occur.
 
 ## Handling server backoff
 
-If the Kinto server instance is under heavy load or maintenance, their admins can [send a Backoff header](http://cliquet.readthedocs.org/en/latest/api/backoff.html) and it's the responsibily for clients to hold on performing more requests for a given amount of time, expressed in seconds.
+If the Kinto server instance is under heavy load or maintenance, their admins can [send a Backoff header](http://kinto.readthedocs.org/en/latest/api/cliquet/backoff.html) and it's the responsibily for clients to hold on performing more requests for a given amount of time, expressed in seconds.
 
 When this happens, Kinto.js will reject calls to `#sync()` with an appropriate error message specifying the number of seconds you need to wait before calling it again.
 
@@ -391,7 +412,7 @@ Transformers are basically hooks for encoding and decoding records, which can wo
 
 ### Remote transformers
 
-Remote transformers aim at encoding records before pushing them to the remote server, and decoding them back when pulling changes. Remote transformers are registered by calling the `Collection#use()` method, which accepts a `Kinto.transformers.RemoteTransformer`-derived object instance:
+Remote transformers aim at encoding records before pushing them to the remote server, and decoding them back when pulling changes. Remote transformers are registered through the optional second argument of `Kinto#collection()`, which accepts `Kinto.transformers.RemoteTransformer`-derived object instances in its `remoteTransformers` array.
 
 ```js
 import Kinto from "kinto";
@@ -411,8 +432,9 @@ class MyRemoteTransformer extends Kinto.transformers.RemoteTransformer {
 }
 
 const kinto = new Kinto({remote: "https://my.server.tld/v1"});
-coll = kinto.collection("articles");
-coll.use(new MyRemoteTransformer());
+coll = kinto.collection("articles", {
+  remoteTransformers: [ new MyRemoteTransformer() ]
+});
 ```
 
 > #### Notes
@@ -461,12 +483,14 @@ class MyAsyncRemoteTransformer extends Kinto.transformers.RemoteTransformer {
   }
 }
 
-coll.use(new MyAsyncRemoteTransformer());
+coll = kinto.collection("articles", {
+  remoteTransformers: [ new MyAsyncRemoteTransformer() ]
+});
 ```
 
 ### Multiple transformers
 
-Transformers are stacked when `#use()` is called multiple times, in the order of the calls; that means you can chain multiple encoding operations, with the decoding ones being processed in the reverse order:
+The remoteTransformers field of the options object passed to `Kinto#collection` is an Array. That means you can chain multiple encoding operations, with the decoding ones being processed in the reverse order:
 
 ```js
 class TitleCharTransformer extends Kinto.transformers.RemoteTransformer {
@@ -484,8 +508,12 @@ class TitleCharTransformer extends Kinto.transformers.RemoteTransformer {
   }
 }
 
-coll.use(new TitleCharTransformer("!"));
-coll.use(new TitleCharTransformer("?"));
+coll = kinto.collection("articles", {
+  remoteTransformers: [
+    new TitleCharTransformer("!"),
+    new TitleCharTransformer("?")
+  ]
+});
 
 coll.create({title: "foo"}).then(_ => coll.sync())
 // remotely saved:
@@ -513,8 +541,12 @@ var TitleCharTransformer = Kinto.createRemoteTransformer({
   }
 });
 
-coll.use(new TitleCharTransformer("!"));
-coll.use(new TitleCharTransformer("?"));
+coll = kinto.collection("articles", {
+  remoteTransformers: [
+    new TitleCharTransformer("!"),
+    new TitleCharTransformer("?")
+  ]
+});
 ```
 
 > #### Notes
@@ -523,6 +555,6 @@ coll.use(new TitleCharTransformer("?"));
 
 ### Limitations
 
-There's currently no way to deal with adding tranformers to an already filled remote database; that would mean remote data migrations, and both Kinto and Kinto.js don't provide this feature just yet.
+There's currently no way to deal with adding transformers to an already filled remote database; that would mean remote data migrations, and both Kinto and Kinto.js don't provide this feature just yet.
 
 **As a rule of thumb, you should only start using transformers on an empty remote collection.**

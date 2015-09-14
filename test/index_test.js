@@ -6,6 +6,7 @@ import sinon from "sinon";
 import { EventEmitter } from "events";
 import { SUPPORTED_PROTOCOL_VERSION as SPV } from "../src/api";
 
+import Collection from "../src/collection";
 import BaseAdapter from "../src/adapters/base";
 import LocalStorage from "../src/adapters/LocalStorage";
 import IDB from "../src/adapters/IDB";
@@ -56,12 +57,18 @@ describe("Kinto", () => {
     });
 
     describe("get transformers()", () => {
-      it("should provide an transformers static getter", () => {
+      it("should provide a transformers static getter", () => {
         expect(Kinto.transformers).to.be.an("object");
       });
 
-      it("should provide an transformers.BaseAdapter getter", () => {
+      it("should provide a transformers.BaseAdapter getter", () => {
         expect(Kinto.transformers.RemoteTransformer).to.eql(RemoteTransformer);
+      });
+    });
+
+    describe("get syncStrategy()", () => {
+      it("should provide a syncStrategy static getter", () => {
+        expect(Kinto.syncStrategy).eql(Collection.strategy);
       });
     });
   });
@@ -154,11 +161,6 @@ describe("Kinto", () => {
       expect(coll.bucket).eql("default");
     });
 
-    it("should cache collection instance", () => {
-      const db = new Kinto();
-      expect(db.collection("a") == db.collection("a")).eql(true);
-    });
-
     it("should reject on missing collection name", () => {
       expect(() => new Kinto().collection())
         .to.Throw(Error, /missing collection name/);
@@ -194,6 +196,24 @@ describe("Kinto", () => {
       const coll = db.collection("plop");
 
       expect(coll.db).to.be.an.instanceOf(MyAdapter);
+    });
+
+    it("should make the collection's remoteTransformers default to []", () => {
+      const db = new Kinto();
+      const coll = db.collection("plop");
+
+      expect(coll.remoteTransformers).to.deep.equal([]);
+    });
+
+    it("should set collection's remoteTransformers", () => {
+      const MyRemoteTransformer = class extends RemoteTransformer {};
+      const db = new Kinto();
+      const options = {
+        remoteTransformers: [ new MyRemoteTransformer() ]
+      };
+      const coll = db.collection("plop", options);
+
+      expect(coll.remoteTransformers).to.deep.equal(options.remoteTransformers);
     });
   });
 });
