@@ -11,7 +11,7 @@ if (!root.hasOwnProperty("localStorage")) {
 
 export default class LocalStorage extends BaseAdapter {
   constructor(dbname) {
-    super();
+    //super();
     this._db = null;
     this._keyStoreName = `${this.dbname}/__keys`;
     this._keyLastModified = `${this.dbname}/__lastModified`;

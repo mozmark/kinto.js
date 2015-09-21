@@ -7,7 +7,7 @@ attachFakeIDBSymbolsTo(typeof global === "object" ? global : window);
 
 export default class IDB extends BaseAdapter {
   constructor(dbname) {
-    super();
+    //super();
     this._db = null;
     // public properties
     this.dbname = dbname;

@@ -8,6 +8,8 @@
  * own remote transformers.
  */
 export default class RemoteTransformer {
+  constructor() {}
+
   get type() {
     return "remote";
   }

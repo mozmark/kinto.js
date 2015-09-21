@@ -1,6 +1,8 @@
 "use strict";
 
 export default class BaseAdapter {
+  constructor() {}
+
   /**
    * Deletes every records present in the database..
    *

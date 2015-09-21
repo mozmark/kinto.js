@@ -8,7 +8,7 @@ const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
  * only if indexedDB is not already available.
  */
 export function attachFakeIDBSymbolsTo(obj) {
-  if (typeof obj.indexedDB === "object") {
+  /*if (typeof obj.indexedDB === "object") {
     return;
   }
   const iDBSymbols = [
@@ -23,7 +23,7 @@ export function attachFakeIDBSymbolsTo(obj) {
     let fakeSymbol = symbol.replace("IDB", "FDB");
     obj[symbol] = require(`fake-indexeddb/lib/${fakeSymbol}`);
   });
-  obj.indexedDB = require("fake-indexeddb");
+  obj.indexedDB = require("fake-indexeddb");*/
 }
 
 /**

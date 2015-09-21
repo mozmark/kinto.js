@@ -40,7 +40,15 @@
       [
         "babelify",
         {
-          "sourceMapRelative": "."
+          "sourceMapRelative": ".",
+          "blacklist": [
+              "es6.arrowFunctions",
+              "es6.classes",
+              "es6.destructuring",
+              "es6.forOf",
+              "es6.literals",
+              "es6.parameters"
+            ]
         }
       ]
     ]

@@ -1,6 +1,6 @@
 "use strict";
 
-import { EventEmitter } from "events";
+//import { EventEmitter } from "events";
 import { quote, unquote } from "./utils.js";
 import HTTP from "./http.js";
 import { partition } from "./utils.js";

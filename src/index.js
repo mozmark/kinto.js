@@ -1,14 +1,15 @@
 "use strict";
 
 import "babel/polyfill";
-import "isomorphic-fetch";
+//import "isomorphic-fetch";
 
 import { EventEmitter } from "events";
 import Api from "./api";
 import Collection from "./collection";
-import BaseAdapter from "./adapters/base";
-import LocalStorage from "./adapters/LocalStorage";
-import IDB from "./adapters/IDB";
+//import BaseAdapter from "./adapters/base";
+//import LocalStorage from "./adapters/LocalStorage";
+import FirefoxStorage from "./adapters/FirefoxStorage";
+//import IDB from "./adapters/IDB";
 import RemoteTransformer from "./transformers/remote";
 
 const DEFAULT_BUCKET_NAME = "default";
@@ -26,9 +27,10 @@ export default class Kinto {
    */
   static get adapters() {
     return {
-      BaseAdapter: BaseAdapter,
+      /*BaseAdapter: BaseAdapter,
       LocalStorage: LocalStorage,
-      IDB: IDB,
+      IDB: IDB,*/
+      FirefoxStorage: FirefoxStorage
     };
   }
 
@@ -69,7 +71,7 @@ export default class Kinto {
 
     class _RemoteTransformer extends RemoteTransformer {
       constructor() {
-        super();
+        // super();
         // If a constructor is passed from the proto object, apply it.
         if (proto.constructor) {
           proto.constructor.apply(this, arguments);
