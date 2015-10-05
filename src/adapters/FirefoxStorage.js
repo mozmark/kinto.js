@@ -29,7 +29,7 @@ export default class FirefoxAdapter {
   }
 
 executeUpdate(sql) {
-   debug("requesting to executing statement: "+sql);
+   debug("requesting to execute statement: "+sql);
    this.executeOperation(function(dbconn, callback) {
       debug("executing statement: "+sql);
       var statement = dbconn.createAsyncStatement(sql);
@@ -45,6 +45,7 @@ executeUpdate(sql) {
           } else {
             debug("Query complete");
           }
+          statement.finalize();
           callback();
         }
       });
