@@ -89,7 +89,7 @@ export default class FirefoxAdapter {
 
   executeUpdate(sql) {
     debug("requesting to execute statement: "+sql);
-    this.executeOperation(function(kintoStorage, callback) {
+    this.executeOperation(function(kintoStorage, complete) {
       debug("executing statement: "+sql);
       var statement = kintoStorage.getStatement(sql);
 
@@ -104,7 +104,7 @@ export default class FirefoxAdapter {
             } else {
               debug("Query complete");
             }
-            callback();
+            complete();
           }
       });
     });
@@ -136,7 +136,7 @@ export default class FirefoxAdapter {
   }
 
   clear() {
-    this.executeOperation(function(kintoStorage, callback) {
+    this.executeOperation(function(kintoStorage, complete) {
       debug("kinto::clear");
       // clear all of the data for this adapter
       var statement = kintoStorage.getStatement("DELETE FROM collection_data WHERE collection_name = :collection_name;");
@@ -156,82 +156,93 @@ export default class FirefoxAdapter {
           if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED) {
             debug("Query canceled or aborted!");
           }
-          callback();
+          complete();
         }
       });
     }.bind(this));
   }
 
   create(record) {
-    if (record && record.id) {
-      this.executeOperation(function(kintoStorage, callback) {
-        debug("kinto::create");
-        // insert a row for this record
-        var statement = kintoStorage.getStatement("INSERT INTO collection_data (collection_name, record_id, record) VALUES (:collection_name, :record_id, :record)");
-        statement.params.collection_name = kintoStorage.getName();
-        statement.params.record_id = record.id;
-        statement.params.record = JSON.stringify(record);
+    return new Promise(function(resolve, reject) {
+      if (record && record.id) {
+        this.executeOperation(function(kintoStorage, complete) {
+          debug("kinto::create");
+          // insert a row for this record
+          var statement = kintoStorage.getStatement("INSERT INTO collection_data (collection_name, record_id, record) VALUES (:collection_name, :record_id, :record)");
+          statement.params.collection_name = kintoStorage.getName();
+          statement.params.record_id = record.id;
+          statement.params.record = JSON.stringify(record);
 
-        // execute the statement
-        statement.executeAsync({
-          handleResult: function(aResultSet) {
-            debug("A result set was not expected");
-          },
+          // execute the statement
+          statement.executeAsync({
+            handleResult: function(aResultSet) {
+              debug("A result set was not expected");
+            },
 
-          handleError: function(aError) {
-            debug("Error: " + aError.message);
-          },
+            handleError: function(aError) {
+              debug("Error: " + aError.message);
+              reject();
+            },
 
-          handleCompletion: function(aReason) {
-            if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED) {
-              debug("Query canceled or aborted!");
+            handleCompletion: function(aReason) {
+              if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED) {
+                debug("Query canceled or aborted!");
+              }
+              resolve(record);
+              complete();
             }
-            callback();
-          }
-        });
-      }.bind(this));
-    }
-    // TODO: If we don't have a record or record ID, throw
+          });
+        }.bind(this));
+      } else {
+        reject();
+      }
+    // TODO: If we don't have a record or record ID, reject
+    }.bind(this));
   }
 
   update(record) {
-    // update the entry for this record
-    if (record && record.id) {
-      this.executeOperation(function(kintoStorage, callback) {
-        debug("kinto::update");
-        var statement = kintoStorage.getStatement("UPDATE collection_data SET record = :record WHERE collection_name = :collection_name AND record_id = :record_id");
-        statement.params.record = JSON.stringify(record);
-        statement.params.collection_name = kintoStorage.getName();
-        statement.params.record_id = record.id;
+    return new Promise(function(resolve, reject) {
+      // update the entry for this record
+      if (record && record.id) {
+        this.executeOperation(function(kintoStorage, complete) {
+          debug("kinto::update");
+          var statement = kintoStorage.getStatement("UPDATE collection_data SET record = :record WHERE collection_name = :collection_name AND record_id = :record_id");
+          statement.params.record = JSON.stringify(record);
+          statement.params.collection_name = kintoStorage.getName();
+          statement.params.record_id = record.id;
 
-        // execute the statement
-        statement.executeAsync({
-          handleResult: function(aResultSet) {
-            debug("A result set was not expected");
-          },
+          // execute the statement
+          statement.executeAsync({
+            handleResult: function(aResultSet) {
+              debug("A result set was not expected");
+            },
 
-          handleError: function(aError) {
-            debug("Error: " + aError.message);
-          },
+            handleError: function(aError) {
+              debug("Error: " + aError.message);
+              reject();
+            },
 
-          handleCompletion: function(aReason) {
-            if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED) {
-              debug("Query canceled or aborted!");
+            handleCompletion: function(aReason) {
+              if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED) {
+                debug("Query canceled or aborted!");
+              }
+              resolve(record);
+              complete();
             }
-            callback();
-          }
-        });
-      }.bind(this));
-    }
+          });
+        }.bind(this));
+      } else {
+        reject();
+      }
+    }.bind(this));
   }
 
   get(id) {
     // get a record with the specified ID
-    if (id) {
+    return new Promise(function(resolve, reject) {
       debug("kinto::get");
-
-      return new Promise(function(resolve, reject) {
-        this.executeOperation(function(kintoStorage, callback) {
+      if (id) {
+        this.executeOperation(function(kintoStorage, complete) {
           var statement = kintoStorage.getStatement("SELECT record FROM collection_data WHERE collection_name = :collection_name AND record_id = :record_id");
           statement.params.collection_name = kintoStorage.getName();
           statement.params.record_id = id;
@@ -258,50 +269,58 @@ export default class FirefoxAdapter {
               if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED) {
                 debug("Query canceled or aborted!");
               }
-              callback();
+              complete();
             }
           });
         }.bind(this));
-      }.bind(this));
-    }
+      } else {
+        reject();
+      }
+    }.bind(this));
   }
 
   delete(id) {
-    if (id) {
-      this.executeOperation(function(kintoStorage, callback) {
-        debug("kinto::delete");
-        // delete the record with the specified ID
-        var kintoStorage = this.getConnection();
-        var statement = kintoStorage.getStatement("DELETE FROM collection_data WHERE collection_name = :collection_name AND record_id = :record_id");
-        statement.params.collection_name = kintoStorage.getName();
-        statement.params.record_id = id;
+    return new Promise(function(resolve,reject){
+      if (id) {
+        this.executeOperation(function(kintoStorage, complete) {
+          debug("kinto::delete");
+          // delete the record with the specified ID
+          var kintoStorage = this.getConnection();
+          var statement = kintoStorage.getStatement("DELETE FROM collection_data WHERE collection_name = :collection_name AND record_id = :record_id");
+          statement.params.collection_name = kintoStorage.getName();
+          statement.params.record_id = id;
 
-        // execute the statement
-        statement.executeAsync({
-          handleResult: function(aResultSet) {
-            debug("A result set was not expected");
-          },
+          // execute the statement
+          statement.executeAsync({
+            handleResult: function(aResultSet) {
+              debug("A result set was not expected");
+            },
 
-          handleError: function(aError) {
-            debug("Error: " + aError.message);
-          },
+            handleError: function(aError) {
+              debug("Error: " + aError.message);
+            },
 
-          handleCompletion: function(aReason) {
-            if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED) {
-              debug("Query canceled or aborted!");
+            handleCompletion: function(aReason) {
+              if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED) {
+                debug("Query canceled or aborted!");
+                reject();
+              } else {
+                resolve(id);
+              }
+              complete();
             }
-            callback();
-          }
-        });
-      }.bind(this));
-    }
-
-    // TODO: throw if there's no id
+          });
+        }.bind(this));
+      } else {
+        // TODO: reject with why?
+        reject();
+      }
+    }.bind(this));
   }
 
   list() {
     return new Promise(function(resolve, reject) {
-      this.executeOperation(function(kintoStorage, callback){
+      this.executeOperation(function(kintoStorage, complete){
         debug("kinto::list");
 
         // list the records
@@ -332,7 +351,7 @@ export default class FirefoxAdapter {
             } else {
               resolve(results);
             }
-            callback();
+            complete();
           }
         });
       }.bind(this));
@@ -341,42 +360,50 @@ export default class FirefoxAdapter {
 
   saveLastModified(lastModified) {
     // store the last modified data
-    // TODO: ensure lastModified is a number?
-    if (lastModified) {
-      this.executeOperation(function(kintoStorage, callback) {
-        var statement = kintoStorage.getStatement("REPLACE INTO collection_metadata (collection_name, last_modified) VALUES (:collection_name, :last_modified)");
-        statement.params.collection_name = kintoStorage.getName();
-        statement.params.last_modified = lastModified;
+    return new Promise(function(resolve,reject) {
+      // TODO: ensure lastModified is a number?
+      if (lastModified) {
+        this.executeOperation(function(kintoStorage, complete) {
+          var statement = kintoStorage.getStatement("REPLACE INTO collection_metadata (collection_name, last_modified) VALUES (:collection_name, :last_modified)");
+          statement.params.collection_name = kintoStorage.getName();
+          statement.params.last_modified = lastModified;
 
-        // execute the statement
-        statement.executeAsync({
-          handleResult: function(aResultSet) {
-            debug("A result set was not expected");
-          },
+          // execute the statement
+          statement.executeAsync({
+            handleResult: function(aResultSet) {
+              debug("A result set was not expected");
+            },
 
-          handleError: function(aError) {
-            debug("Error: " + aError.message);
-          },
+            handleError: function(aError) {
+              debug("Error: " + aError.message);
+            },
 
-          handleCompletion: function(aReason) {
-            if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED) {
-              debug("Query canceled or aborted!");
+            handleCompletion: function(aReason) {
+              if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED) {
+                debug("Query canceled or aborted!");
+                reject();
+              } else {
+                resolve(lastModified);
+              }
+              complete();
             }
-            callback();
-          }
-        });
-      }.bind(this));
-    }
-
-    // TODO: Throw if there's no last modified
+          });
+        }.bind(this));
+      } else {
+        // TODO: Explain why
+        reject();
+      }
+    }.bind(this));
   }
 
   getLastModified() {
     return new Promise(function(resolve, reject) {
-      this.executeOperation(function (kintoStorage, callback){
+      debug("kinto::getLastModified");
+      this.executeOperation(function (kintoStorage, complete){
         // retrieve the last modified data
         var statement = kintoStorage.getStatement("SELECT last_modified FROM collection_metadata WHERE collection_name = :collection_name");
         statement.params.collection_name = kintoStorage.getName();
+        let result = 0;
 
         // execute the statement
         statement.executeAsync({
@@ -385,8 +412,7 @@ export default class FirefoxAdapter {
             for (let row = aResultSet.getNextRow(); row; row = aResultSet.getNextRow()) {
                   let value = row.getResultByName("last_modified");
                   debug(value);
-                  var result = JSON.parse(value);
-                  return resolve(result);
+                  result = JSON.parse(value);
                 }
             resolve(undefined);
           },
@@ -399,8 +425,12 @@ export default class FirefoxAdapter {
           handleCompletion: function(aReason) {
             if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED) {
               debug("Query canceled or aborted!");
+              reject();
+            } else {
+              debug("last modified result was "+result);
+              resolve(result);
             }
-            callback();
+            complete();
           }
         });
       }.bind(this));
