@@ -3,7 +3,7 @@
 import "babel/polyfill";
 //import "isomorphic-fetch";
 
-import { EventEmitter } from "events";
+// import { EventEmitter } from "events";
 import Api from "./api";
 import Collection from "./collection";
 //import BaseAdapter from "./adapters/base";
@@ -100,7 +100,7 @@ export default class Kinto {
     const defaults = {
       adapter: Kinto.adapters.IDB,
       bucket: DEFAULT_BUCKET_NAME,
-      events: new EventEmitter(),
+      //events: new EventEmitter(),
       remote: DEFAULT_REMOTE,
     };
     this._options = Object.assign(defaults, options);

@@ -44,7 +44,8 @@ export default class Api {
     this.remote = remote;
     this.optionHeaders = options.headers || {};
     this.serverSettings = null;
-    this.events = options.events || new EventEmitter();
+    //this.events = options.events || new EventEmitter();
+    this.events = options.events;
     try {
       this.version = remote.match(/\/(v\d+)\/?$/)[1];
     } catch (err) {

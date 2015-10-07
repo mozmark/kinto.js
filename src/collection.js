@@ -1,6 +1,6 @@
 "use strict";
 
-import { EventEmitter } from "events";
+//import { EventEmitter } from "events";
 import { v4 as uuid4 } from "uuid";
 import deepEquals from "deep-eql";
 
@@ -72,13 +72,14 @@ export default class Collection {
     const DBAdapter = options.adapter || IDB;
     const dbPrefix = options.dbPrefix || "";
     const db = new DBAdapter(`${dbPrefix}${bucket}/${name}`);
-    if (!(db instanceof BaseAdapter)) {
-      throw new Error("Unsupported adapter.");
-    }
+    //if (!(db instanceof BaseAdapter)) {
+    //  throw new Error("Unsupported adapter.");
+    //}
     // public properties
     this.db = db;
     this.api = api;
-    this.events = options.events || new EventEmitter();
+    //this.events = options.events || new EventEmitter();
+    this.events = options.events;
     this.remoteTransformers = options.remoteTransformers ||  [];
   }
 

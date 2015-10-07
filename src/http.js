@@ -1,6 +1,6 @@
 "use strict";
 
-import { EventEmitter } from "events";
+//import { EventEmitter } from "events";
 import ERROR_CODES from "./errors.js";
 
 /**
@@ -25,7 +25,8 @@ export default class HTTP {
    */
   constructor(options={requestMode: "cors"}) {
     // public properties
-    this.events = options.events || new EventEmitter();
+    //this.events = options.events || new EventEmitter();
+    this.events = options.events;
     this.requestMode = options.requestMode;
   }
 
