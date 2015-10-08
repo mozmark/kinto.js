@@ -24,6 +24,7 @@ class KintoStorage {
       debug("statement does not exist; creating");
       let dbconn = this.getConnection();
       if (dbconn) {
+        debug("connection is ready? "+dbconn.connectionReady);
         statement = dbconn.createAsyncStatement(statementString);
         this.statements[statementString] = statement;
       } else {
@@ -54,13 +55,13 @@ class KintoStorage {
     if (this._dbconn) {
       debug("closing the connection");
       this._dbconn.asyncClose(this.connectionClosed.bind(this));
+      this._dbconn = null;
+      this.statements = {};
     }
   }
 
   connectionClosed() {
     debug('connection closed');
-    this._dbconn = null;
-    this.statements = {};
   }
 }
 
@@ -160,10 +161,11 @@ export function makeFXAdapter(BaseAdapter) {
                 resolve();
               }
               complete();
-              // TODO: Also saveLastModified to 0
             }
           });
         });
+      }.bind(this)).then(function(){
+        return this.saveLastModified(1);
       }.bind(this));
     }
 
