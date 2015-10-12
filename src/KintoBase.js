@@ -59,11 +59,9 @@ export default class KintoBase {
     if (!this._options.adapter) {
       throw new Error("No adapter provided");
     }
-    this._api = new Api(this._options.remote, {
-      headers:     this._options.headers,
-      events:      this._options.events,
-      requestMode: this._options.requestMode,
-    });
+
+    const {remote, events, headers, requestMode} = this._options;
+    this._api = new Api(remote, events, {headers, requestMode});
 
     // public properties
     /**
